@@ -15,6 +15,10 @@ bool ContactInterfaceNode::initialize() {
     normal_xy_speed = pnh->param("normal_xy_speed", 12.0F);
     approach_xy_speed = pnh->param("approach_xy_speed", 0.5F);
     is_dummy_test = pnh->param("is_dummy_test", false);
+    initial_approach_att_mode = pnh->param("initial_approach_att_mode", (int)core_px4_interface::AttMode::ZERO_TILT);
+    tilt_estimation_att_mode = pnh->param("tilt_estimation_att_mode", (int)core_px4_interface::AttMode::ESTIMATE);
+    final_approach_att_mode = pnh->param("final_approach_att_mode", (int)core_px4_interface::AttMode::LOCK_TILT);
+    departure_att_mode = pnh->param("departure_att_mode", (int)core_px4_interface::AttMode::ZERO_TILT);
 
     // init subscribers
     pose_sub = nh->subscribe<geometry_msgs::PoseStamped>(
@@ -204,23 +208,23 @@ void ContactInterfaceNode::change_status(ApproachStatus as, ContactStatus cs,
     if (cs == ContactStatus::InContact &&
         contact_status != ContactStatus::InContact) {
         delay_started = ros::Time::now();
+    } else if (as == ApproachStatus::GettingClose &&
+               approach_status != ApproachStatus::GettingClose) {
+        publish_att_mode(initial_approach_att_mode);
     } else if (as == ApproachStatus::LockingTilt &&
                approach_status != ApproachStatus::LockingTilt) {
         delay_started = ros::Time::now();
-        publish_att_mode(core_px4_interface::AttMode::ZERO_TILT);
+        publish_att_mode(tilt_estimation_att_mode);
     } else if (as == ApproachStatus::FinalStage &&
                approach_status != ApproachStatus::FinalStage) {
-        publish_att_mode(core_px4_interface::AttMode::ZERO_TILT);
+        publish_att_mode(final_approach_att_mode);
         publish_max_xy_vel(approach_xy_speed);
-    } else if (as == ApproachStatus::LockingTilt &&
-               approach_status != ApproachStatus::LockingTilt) {
-        delay_started = ros::Time::now();
     } else if (ts == TaskStatus::Aborted && ts != task_status) {
-        publish_att_mode(core_px4_interface::AttMode::ZERO_TILT);
+        publish_att_mode(departure_att_mode);
         publish_max_xy_vel(normal_xy_speed);
     } else if (cs == ContactStatus::Departing &&
                contact_status != ContactStatus::Departing) {
-        publish_att_mode(core_px4_interface::AttMode::ZERO_TILT);
+        publish_att_mode(departure_att_mode);
         publish_max_xy_vel(normal_xy_speed);
     }
 

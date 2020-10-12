@@ -8,5 +8,9 @@
       <param name="normal_xy_speed" type="double" value="0.5" />
       <param name="approach_xy_speed" type="double" value="0.3" />
       <param name="is_dummy_test" type="bool" value="false" />
+      <param name="initial_approach_att_mode" type="int" value="2" />
+      <param name="tilt_estimation_att_mode" type="int" value="5" />
+      <param name="final_approach_att_mode" type="int" value="3" />
+      <param name="departure_att_mode" type="int" value="2" />
   </node>
 </launch>

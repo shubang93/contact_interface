@@ -43,6 +43,7 @@ private:
 
   // parameters
   float status_pub_rate, distance_step, stop_distance, tilt_lock_distance, normal_xy_speed, approach_xy_speed;
+  int initial_approach_att_mode, tilt_estimation_att_mode, final_approach_att_mode, departure_att_mode;
   bool is_dummy_test;
 
   // variables
