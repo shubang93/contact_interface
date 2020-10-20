@@ -15,6 +15,8 @@ bool ContactInterfaceNode::initialize() {
     normal_xy_speed = pnh->param("normal_xy_speed", 12.0F);
     approach_xy_speed = pnh->param("approach_xy_speed", 0.5F);
     is_dummy_test = pnh->param("is_dummy_test", false);
+    use_angle_estimation = pnh->param("use_angle_estimation", true);
+    angle_estimation_p = pnh->param("angle_estimation_p", 1.F);
     initial_approach_att_mode = pnh->param("initial_approach_att_mode", (int)core_px4_interface::AttMode::ZERO_TILT);
     tilt_estimation_att_mode = pnh->param("tilt_estimation_att_mode", (int)core_px4_interface::AttMode::ESTIMATE);
     final_approach_att_mode = pnh->param("final_approach_att_mode", (int)core_px4_interface::AttMode::LOCK_TILT);
@@ -123,25 +125,25 @@ void ContactInterfaceNode::contact_command_callback(
     if (is_dummy_test) {
         contact_status = ContactStatus::Approaching;
         approach_status = ApproachStatus::FinalStage;
-        process_depth_reading(stop_distance + distance_step);
+        process_depth_reading(stop_distance + distance_step, 0.f);
     }
 }
 
 void ContactInterfaceNode::depth_callback(
     const geometry_msgs::Vector3Stamped::ConstPtr &msg) {
-    process_depth_reading(msg->vector.z);
+    process_depth_reading(msg->vector.z, (use_angle_estimation)?(msg->vector.x - M_PI_2) : 0.f);
 }
 
-void ContactInterfaceNode::process_depth_reading(float depth) {
+void ContactInterfaceNode::process_depth_reading(float depth, float angle) {
     if ((contact_status != ContactStatus::Approaching &&
          contact_status != ContactStatus::Waiting) ||
         task_status != TaskStatus::InProgress)
         return;
 
-    // Read the current distance from the wall (in meters)
-    float dist = depth;
+    if (isnan(depth) || isnan(angle)) return;
 
-    if (isnan(dist)) return;
+    // Read the current distance from the wall (in meters)
+    float dist = depth * std::cos(angle);
 
     if (dist <= stop_distance) {
         change_status(ApproachStatus::GettingClose, ContactStatus::InContact,
@@ -158,18 +160,19 @@ void ContactInterfaceNode::process_depth_reading(float depth) {
                   TaskStatus::InProgress);
 
     double dist_forward;
+    double diff_angle = angle * angle_estimation_p;
 
     switch (approach_status) {
         case ApproachStatus::GettingClose:
             dist_forward = std::min(dist - tilt_lock_distance, distance_step);
-            fly_forward(dist_forward);
+            fly_forward(dist_forward, diff_angle);
             break;
         case ApproachStatus::LockingTilt:
             // Do nothing
             break;
         case ApproachStatus::FinalStage:
             dist_forward = std::min(dist - stop_distance, distance_step);
-            fly_forward(dist_forward);
+            fly_forward(dist_forward, diff_angle);
             break;
     }
 }
@@ -184,7 +187,7 @@ void ContactInterfaceNode::status_publisher_timer_callback(
     publish_status();
 }
 
-void ContactInterfaceNode::fly_forward(const double dist_forward) {
+void ContactInterfaceNode::fly_forward(const double dist_forward, const double diff_angle) {
     current_command.ContactPoint = current_pose.pose;
 
     // Get the current yaw
@@ -193,7 +196,7 @@ void ContactInterfaceNode::fly_forward(const double dist_forward) {
         current_pose.pose.orientation.z, current_pose.pose.orientation.w);
     double roll, pitch, yaw_enu;
     tf::Matrix3x3(q).getRPY(roll, pitch, yaw_enu);
-    double yaw = M_PI / 2 - yaw_enu;
+    double yaw = M_PI_2 - yaw_enu - diff_angle;
 
     // Set the destination as a bit forward in the direction of the current yaw
     current_command.ContactPoint.position.x += dist_forward * std::sin(yaw);

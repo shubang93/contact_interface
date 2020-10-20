@@ -42,9 +42,9 @@ private:
   };
 
   // parameters
-  float status_pub_rate, distance_step, stop_distance, tilt_lock_distance, normal_xy_speed, approach_xy_speed;
+  float status_pub_rate, distance_step, stop_distance, tilt_lock_distance, normal_xy_speed, approach_xy_speed, angle_estimation_p;
   int initial_approach_att_mode, tilt_estimation_att_mode, final_approach_att_mode, departure_att_mode;
-  bool is_dummy_test;
+  bool is_dummy_test, use_angle_estimation;
 
   // variables
   bool is_offboard = false;
@@ -92,9 +92,9 @@ private:
   void approach_final_stage();
   void depart();
   void contact();
-  void fly_forward(const double dist_forward);
+  void fly_forward(const double dist_forward, const double diff_angle);
   void change_status(ApproachStatus as, ContactStatus cs, TaskStatus ts);
-  void process_depth_reading(float depth);
+  void process_depth_reading(float depth, float angle);
 
 public:
   ContactInterfaceNode(std::string node_name);

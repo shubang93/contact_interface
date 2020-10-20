@@ -12,5 +12,7 @@
       <param name="tilt_estimation_att_mode" type="int" value="5" />
       <param name="final_approach_att_mode" type="int" value="3" />
       <param name="departure_att_mode" type="int" value="2" />
+      <param name="use_angle_estimation" type="bool" value="true" />
+      <param name="angle_estimation_p" type="double" value="1.0" />
   </node>
 </launch>
