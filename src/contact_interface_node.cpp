@@ -16,7 +16,7 @@ bool ContactInterfaceNode::initialize() {
     approach_xy_speed = pnh->param("approach_xy_speed", 0.5F);
     is_dummy_test = pnh->param("is_dummy_test", false);
     use_angle_estimation = pnh->param("use_angle_estimation", true);
-    angle_estimation_p = pnh->param("angle_estimation_p", 1.F);
+    angle_correction_max = pnh->param("angle_correction_max", 1.F);
     initial_approach_att_mode = pnh->param("initial_approach_att_mode", (int)core_px4_interface::AttMode::ZERO_TILT);
     tilt_estimation_att_mode = pnh->param("tilt_estimation_att_mode", (int)core_px4_interface::AttMode::ESTIMATE);
     final_approach_att_mode = pnh->param("final_approach_att_mode", (int)core_px4_interface::AttMode::LOCK_TILT);
@@ -160,7 +160,9 @@ void ContactInterfaceNode::process_depth_reading(float depth, float angle) {
                   TaskStatus::InProgress);
 
     double dist_forward;
-    double diff_angle = angle * angle_estimation_p;
+    double diff_angle = std::min((double)angle, angle_correction_max * M_PI / 180.F);
+    if (angle < 0)
+        diff_angle = std::max((double)angle, -angle_correction_max * M_PI / 180.F);
 
     switch (approach_status) {
         case ApproachStatus::GettingClose:
