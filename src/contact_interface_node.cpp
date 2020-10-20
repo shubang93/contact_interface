@@ -131,7 +131,8 @@ void ContactInterfaceNode::contact_command_callback(
 
 void ContactInterfaceNode::depth_callback(
     const geometry_msgs::Vector3Stamped::ConstPtr &msg) {
-    process_depth_reading(msg->vector.z, (use_angle_estimation)?(msg->vector.x - M_PI_2) : 0.f);
+    if (use_angle_estimation && msg->vector.x < 0.0001) return;
+    process_depth_reading(msg->vector.z, (use_angle_estimation)?(M_PI_2 - msg->vector.x) : 0.f);
 }
 
 void ContactInterfaceNode::process_depth_reading(float depth, float angle) {
@@ -144,6 +145,8 @@ void ContactInterfaceNode::process_depth_reading(float depth, float angle) {
 
     // Read the current distance from the wall (in meters)
     float dist = depth * std::cos(angle);
+
+    // ROS_WARN("%0.2lf, %0.2lf, %0.3lf, %0.3lf", dist, depth, angle, std::cos(angle));
 
     if (dist <= stop_distance) {
         change_status(ApproachStatus::GettingClose, ContactStatus::InContact,
@@ -163,6 +166,8 @@ void ContactInterfaceNode::process_depth_reading(float depth, float angle) {
     double diff_angle = std::min((double)angle, angle_correction_max * M_PI / 180.F);
     if (angle < 0)
         diff_angle = std::max((double)angle, -angle_correction_max * M_PI / 180.F);
+
+    // ROS_WARN("Angle: %0.3lf, Diff: %0.3lf", angle, diff_angle);
 
     switch (approach_status) {
         case ApproachStatus::GettingClose:
@@ -198,7 +203,9 @@ void ContactInterfaceNode::fly_forward(const double dist_forward, const double d
         current_pose.pose.orientation.z, current_pose.pose.orientation.w);
     double roll, pitch, yaw_enu;
     tf::Matrix3x3(q).getRPY(roll, pitch, yaw_enu);
-    double yaw = M_PI_2 - yaw_enu - diff_angle;
+    
+    yaw_enu += diff_angle;
+    double yaw = M_PI_2 - yaw_enu;
 
     // Set the destination as a bit forward in the direction of the current yaw
     current_command.ContactPoint.position.x += dist_forward * std::sin(yaw);
@@ -206,6 +213,13 @@ void ContactInterfaceNode::fly_forward(const double dist_forward, const double d
 
     // Don't change the altitude during the sequence
     current_command.ContactPoint.position.z = starting_pose.pose.position.z;
+
+    // Update the yaw as well
+    q.setRPY(roll, pitch, yaw_enu);
+    current_command.ContactPoint.orientation.x = q.x();
+    current_command.ContactPoint.orientation.y = q.y();
+    current_command.ContactPoint.orientation.z = q.z();
+    current_command.ContactPoint.orientation.w = q.w();
 }
 
 void ContactInterfaceNode::change_status(ApproachStatus as, ContactStatus cs,
